@@ -1,3 +1,4 @@
+// Package config provides the configuration for the application.
 package config
 
 import (
@@ -15,7 +16,8 @@ const (
 )
 
 type Config struct {
-	Mode    string     `yaml:"mode" conf:"default:development"` // development or production
+	conf.Version
+	Mode    string     `yaml:"mode"    conf:"default:development"` // development or production
 	Web     WebConfig  `yaml:"web"`
 	Storage Storage    `yaml:"storage"`
 	Log     LoggerConf `yaml:"logger"`
@@ -26,26 +28,35 @@ type Config struct {
 }
 
 type Options struct {
-	AllowRegistration    bool `yaml:"disable_registration" conf:"default:true"`
-	AutoIncrementAssetID bool `yaml:"auto_increment_asset_id" conf:"default:true"`
+	AllowRegistration    bool   `yaml:"disable_registration"    conf:"default:true"`
+	AutoIncrementAssetID bool   `yaml:"auto_increment_asset_id" conf:"default:true"`
+	CurrencyConfig       string `yaml:"currencies"`
 }
 
 type DebugConf struct {
 	Enabled bool   `yaml:"enabled" conf:"default:false"`
-	Port    string `yaml:"port" conf:"default:4000"`
+	Port    string `yaml:"port"    conf:"default:4000"`
 }
 
 type WebConfig struct {
-	Port          string `yaml:"port" conf:"default:7745"`
+	Port          string `yaml:"port"            conf:"default:7745"`
 	Host          string `yaml:"host"`
 	MaxUploadSize int64  `yaml:"max_file_upload" conf:"default:10"`
+	ReadTimeout   int    `yaml:"read_timeout"    conf:"default:10"`
+	WriteTimeout  int    `yaml:"write_timeout"   conf:"default:10"`
+	IdleTimeout   int    `yaml:"idle_timeout"    conf:"default:30"`
 }
 
 // New parses the CLI/Config file and returns a Config struct. If the file argument is an empty string, the
 // file is not read. If the file is not empty, the file is read and the Config struct is returned.
-func New() (*Config, error) {
+func New(buildstr string, description string) (*Config, error) {
 	var cfg Config
 	const prefix = "HBOX"
+
+	cfg.Version = conf.Version{
+		Build: buildstr,
+		Desc:  description,
+	}
 
 	help, err := conf.Parse(prefix, &cfg)
 	if err != nil {

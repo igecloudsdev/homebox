@@ -9,7 +9,7 @@ import { sharedUserClient } from "../test-utils";
 describe("user should be able to create an item and add an attachment", () => {
   let increment = 0;
   /**
-   * useLocatio sets up a location resource for testing, and returns a function
+   * useLocation sets up a location resource for testing, and returns a function
    * that can be used to delete the location from the backend server.
    */
   async function useLocation(api: UserClient): Promise<[LocationOut, () => Promise<void>]> {
@@ -135,9 +135,9 @@ describe("user should be able to create an item and add an attachment", () => {
       const { response, data } = await api.items.maintenance.create(item.id, {
         name: faker.vehicle.model(),
         description: faker.lorem.paragraph(1),
-        completedDate: faker.date.past(1),
+        completedDate: faker.date.past(),
         scheduledDate: "null",
-        cost: faker.datatype.number(100).toString(),
+        cost: faker.number.int(100).toString(),
       });
 
       expect(response.status).toBe(201);

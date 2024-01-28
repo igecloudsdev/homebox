@@ -1,3 +1,4 @@
+// Package v1 provides the API handlers for version 1 of the API.
 package v1
 
 import (
@@ -74,7 +75,7 @@ type (
 		BuildTime string `json:"buildTime"`
 	}
 
-	ApiSummary struct {
+	APISummary struct {
 		Healthy           bool     `json:"health"`
 		Versions          []string `json:"versions"`
 		Title             string   `json:"title"`
@@ -85,7 +86,7 @@ type (
 	}
 )
 
-func BaseUrlFunc(prefix string) func(s string) string {
+func BaseURLFunc(prefix string) func(s string) string {
 	return func(s string) string {
 		return prefix + "/v1" + s
 	}
@@ -111,11 +112,11 @@ func NewControllerV1(svc *services.AllServices, repos *repo.AllRepos, bus *event
 //	@Summary Application Info
 //	@Tags    Base
 //	@Produce json
-//	@Success 200 {object} ApiSummary
+//	@Success 200 {object} APISummary
 //	@Router  /v1/status [GET]
 func (ctrl *V1Controller) HandleBase(ready ReadyFunc, build Build) errchain.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		return server.JSON(w, http.StatusOK, ApiSummary{
+		return server.JSON(w, http.StatusOK, APISummary{
 			Healthy:           ready(),
 			Title:             "Homebox",
 			Message:           "Track, Manage, and Organize your Things",
@@ -123,6 +124,22 @@ func (ctrl *V1Controller) HandleBase(ready ReadyFunc, build Build) errchain.Hand
 			Demo:              ctrl.isDemo,
 			AllowRegistration: ctrl.allowRegistration,
 		})
+	}
+}
+
+// HandleCurrency godoc
+//
+// @Summary Currency
+// @Tags    Base
+// @Produce json
+// @Success 200 {object} currencies.Currency
+// @Router  /v1/currency [GET]
+func (ctrl *V1Controller) HandleCurrency() errchain.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		// Set Cache for 10 Minutes
+		w.Header().Set("Cache-Control", "max-age=600")
+
+		return server.JSON(w, http.StatusOK, ctrl.svc.Currencies.Slice())
 	}
 }
 

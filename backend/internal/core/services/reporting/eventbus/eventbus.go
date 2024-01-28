@@ -1,4 +1,4 @@
-// / Package eventbus provides an interface for event bus.
+// Package eventbus provides an interface for event bus.
 package eventbus
 
 import (
@@ -38,7 +38,7 @@ func New() *EventBus {
 		subscribers: map[Event][]func(any){
 			EventLabelMutation:    {},
 			EventLocationMutation: {},
-      EventItemMutation:     {},
+			EventItemMutation:     {},
 		},
 	}
 }

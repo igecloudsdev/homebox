@@ -36,6 +36,7 @@ type (
 		AssetID         AssetID      `json:"assetId"`
 		LocationIDs     []uuid.UUID  `json:"locationIds"`
 		LabelIDs        []uuid.UUID  `json:"labelIds"`
+		ParentItemIDs   []uuid.UUID  `json:"parentIds"`
 		SortBy          string       `json:"sortBy"`
 		IncludeArchived bool         `json:"includeArchived"`
 		Fields          []FieldQuery `json:"fields"`
@@ -54,8 +55,8 @@ type (
 
 	ItemCreate struct {
 		ImportRef   string    `json:"-"`
-		ParentID    uuid.UUID `json:"parentId" extensions:"x-nullable"`
-		Name        string    `json:"name" validate:"required,min=1,max=255"`
+		ParentID    uuid.UUID `json:"parentId"    extensions:"x-nullable"`
+		Name        string    `json:"name"        validate:"required,min=1,max=255"`
 		Description string    `json:"description" validate:"max=1000"`
 		AssetID     AssetID   `json:"-"`
 
@@ -65,9 +66,9 @@ type (
 	}
 
 	ItemUpdate struct {
-		ParentID    uuid.UUID `json:"parentId" extensions:"x-nullable,x-omitempty"`
+		ParentID    uuid.UUID `json:"parentId"    extensions:"x-nullable,x-omitempty"`
 		ID          uuid.UUID `json:"id"`
-		AssetID     AssetID   `json:"assetId"`
+		AssetID     AssetID   `json:"assetId"     swaggertype:"string"`
 		Name        string    `json:"name"`
 		Description string    `json:"description"`
 		Quantity    int       `json:"quantity"`
@@ -107,7 +108,7 @@ type (
 	ItemPatch struct {
 		ID        uuid.UUID `json:"id"`
 		Quantity  *int      `json:"quantity,omitempty" extensions:"x-nullable,x-omitempty"`
-		ImportRef *string   `json:"-,omitempty" extensions:"x-nullable,x-omitempty"`
+		ImportRef *string   `json:"-,omitempty"        extensions:"x-nullable,x-omitempty"`
 	}
 
 	ItemSummary struct {
@@ -159,7 +160,6 @@ type (
 
 		Attachments []ItemAttachment `json:"attachments"`
 		Fields      []ItemField      `json:"fields"`
-		Children    []ItemSummary    `json:"children"`
 	}
 )
 
@@ -240,11 +240,6 @@ func mapItemOut(item *ent.Item) ItemOut {
 		fields = mapFields(item.Edges.Fields)
 	}
 
-	var children []ItemSummary
-	if item.Edges.Children != nil {
-		children = mapEach(item.Edges.Children, mapItemSummary)
-	}
-
 	var parent *ItemSummary
 	if item.Edges.Parent != nil {
 		v := mapItemSummary(item.Edges.Parent)
@@ -278,13 +273,12 @@ func mapItemOut(item *ent.Item) ItemOut {
 		Notes:       item.Notes,
 		Attachments: attachments,
 		Fields:      fields,
-		Children:    children,
 	}
 }
 
-func (r *ItemsRepository) publishMutationEvent(GID uuid.UUID) {
-	if r.bus != nil {
-		r.bus.Publish(eventbus.EventItemMutation, eventbus.GroupMutationEvent{GID: GID})
+func (e *ItemsRepository) publishMutationEvent(GID uuid.UUID) {
+	if e.bus != nil {
+		e.bus.Publish(eventbus.EventItemMutation, eventbus.GroupMutationEvent{GID: GID})
 	}
 }
 
@@ -296,7 +290,6 @@ func (e *ItemsRepository) getOne(ctx context.Context, where ...predicate.Item) (
 		WithLabel().
 		WithLocation().
 		WithGroup().
-		WithChildren().
 		WithParent().
 		WithAttachments(func(aq *ent.AttachmentQuery) {
 			aq.WithDocument()
@@ -348,8 +341,10 @@ func (e *ItemsRepository) QueryByGroup(ctx context.Context, gid uuid.UUID, q Ite
 			item.Or(
 				item.NameContainsFold(q.Search),
 				item.DescriptionContainsFold(q.Search),
-				item.NotesContainsFold(q.Search),
+				item.SerialNumberContainsFold(q.Search),
+				item.ModelNumberContainsFold(q.Search),
 				item.ManufacturerContainsFold(q.Search),
+				item.NotesContainsFold(q.Search),
 			),
 		)
 	}
@@ -397,6 +392,10 @@ func (e *ItemsRepository) QueryByGroup(ctx context.Context, gid uuid.UUID, q Ite
 			}
 
 			andPredicates = append(andPredicates, item.Or(fieldPredicates...))
+		}
+
+		if len(q.ParentItemIDs) > 0 {
+			andPredicates = append(andPredicates, item.HasParentWith(item.IDIn(q.ParentItemIDs...)))
 		}
 	}
 
@@ -848,6 +847,7 @@ func (e *ItemsRepository) SetPrimaryPhotos(ctx context.Context, GID uuid.UUID) (
 		Where(
 			item.HasGroupWith(group.ID(GID)),
 			item.HasAttachmentsWith(
+				attachment.TypeEQ(attachment.TypePhoto),
 				attachment.Not(
 					attachment.And(
 						attachment.Primary(true),

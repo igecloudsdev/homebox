@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/hay-kot/homebox/backend/internal/core/currencies"
 	"github.com/hay-kot/homebox/backend/internal/core/services"
 	"github.com/hay-kot/homebox/backend/internal/core/services/reporting/eventbus"
 	"github.com/hay-kot/homebox/backend/internal/data/ent"
@@ -35,6 +37,15 @@ var (
 	buildTime = "now"
 )
 
+func build() string {
+	short := commit
+	if len(short) > 7 {
+		short = short[:7]
+	}
+
+	return fmt.Sprintf("%s, commit %s, built at %s", version, short, buildTime)
+}
+
 // @title                      Homebox API
 // @version                    1.0
 // @description                Track, Manage, and Organize your Things.
@@ -47,7 +58,7 @@ var (
 func main() {
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 
-	cfg, err := config.New()
+	cfg, err := config.New(build(), "Homebox inventory management system")
 	if err != nil {
 		panic(err)
 	}
@@ -69,12 +80,12 @@ func run(cfg *config.Config) error {
 		log.Fatal().Err(err).Msg("failed to create data directory")
 	}
 
-	c, err := ent.Open("sqlite3", cfg.Storage.SqliteUrl)
+	c, err := ent.Open("sqlite3", cfg.Storage.SqliteURL)
 	if err != nil {
 		log.Fatal().
 			Err(err).
 			Str("driver", "sqlite").
-			Str("url", cfg.Storage.SqliteUrl).
+			Str("url", cfg.Storage.SqliteURL).
 			Msg("failed opening connection to sqlite")
 	}
 	defer func(c *ent.Client) {
@@ -107,7 +118,7 @@ func run(cfg *config.Config) error {
 		log.Fatal().
 			Err(err).
 			Str("driver", "sqlite").
-			Str("url", cfg.Storage.SqliteUrl).
+			Str("url", cfg.Storage.SqliteURL).
 			Msg("failed creating schema resources")
 	}
 
@@ -117,12 +128,40 @@ func run(cfg *config.Config) error {
 		return err
 	}
 
+	collectFuncs := []currencies.CollectorFunc{
+		currencies.CollectDefaults(),
+	}
+
+	if cfg.Options.CurrencyConfig != "" {
+		log.Info().
+			Str("path", cfg.Options.CurrencyConfig).
+			Msg("loading currency config file")
+
+		content, err := os.ReadFile(cfg.Options.CurrencyConfig)
+		if err != nil {
+			log.Fatal().
+				Err(err).
+				Str("path", cfg.Options.CurrencyConfig).
+				Msg("failed to read currency config file")
+		}
+
+		collectFuncs = append(collectFuncs, currencies.CollectJSON(bytes.NewReader(content)))
+	}
+
+	currencies, err := currencies.CollectionCurrencies(collectFuncs...)
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Msg("failed to collect currencies")
+	}
+
 	app.bus = eventbus.New()
 	app.db = c
 	app.repos = repo.New(c, app.bus, cfg.Storage.Data)
 	app.services = services.New(
 		app.repos,
 		services.WithAutoIncrementAssetID(cfg.Options.AutoIncrementAssetID),
+		services.WithCurrencies(currencies),
 	)
 
 	// =========================================================================
@@ -146,6 +185,9 @@ func run(cfg *config.Config) error {
 	app.server = server.NewServer(
 		server.WithHost(app.conf.Web.Host),
 		server.WithPort(app.conf.Web.Port),
+		server.WithReadTimeout(app.conf.Web.ReadTimeout),
+		server.WithWriteTimeout(app.conf.Web.WriteTimeout),
+		server.WithIdleTimeout(app.conf.Web.IdleTimeout),
 	)
 	log.Info().Msgf("Starting HTTP Server on %s:%s", app.server.Host, app.server.Port)
 

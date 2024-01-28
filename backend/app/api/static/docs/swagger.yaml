@@ -1,5 +1,16 @@
 basePath: /api
 definitions:
+  currencies.Currency:
+    properties:
+      code:
+        type: string
+      local:
+        type: string
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
   repo.DocumentOut:
     properties:
       id:
@@ -116,10 +127,6 @@ definitions:
         items:
           $ref: '#/definitions/repo.ItemAttachment'
         type: array
-      children:
-        items:
-          $ref: '#/definitions/repo.ItemSummary'
-        type: array
       createdAt:
         type: string
       description:
@@ -142,7 +149,8 @@ definitions:
         description: Warranty
         type: boolean
       location:
-        $ref: '#/definitions/repo.LocationSummary'
+        allOf:
+        - $ref: '#/definitions/repo.LocationSummary'
         description: Edges
         x-nullable: true
         x-omitempty: true
@@ -156,7 +164,8 @@ definitions:
         description: Extras
         type: string
       parent:
-        $ref: '#/definitions/repo.ItemSummary'
+        allOf:
+        - $ref: '#/definitions/repo.ItemSummary'
         x-nullable: true
         x-omitempty: true
       purchaseFrom:
@@ -216,7 +225,8 @@ definitions:
           $ref: '#/definitions/repo.LabelSummary'
         type: array
       location:
-        $ref: '#/definitions/repo.LocationSummary'
+        allOf:
+        - $ref: '#/definitions/repo.LocationSummary'
         description: Edges
         x-nullable: true
         x-omitempty: true
@@ -295,7 +305,6 @@ definitions:
       warrantyDetails:
         type: string
       warrantyExpires:
-        description: Sold
         type: string
     type: object
   repo.LabelCreate:
@@ -410,7 +419,6 @@ definitions:
   repo.MaintenanceEntry:
     properties:
       completedDate:
-        description: Sold
         type: string
       cost:
         example: "0"
@@ -422,13 +430,11 @@ definitions:
       name:
         type: string
       scheduledDate:
-        description: Sold
         type: string
     type: object
   repo.MaintenanceEntryCreate:
     properties:
       completedDate:
-        description: Sold
         type: string
       cost:
         example: "0"
@@ -438,7 +444,6 @@ definitions:
       name:
         type: string
       scheduledDate:
-        description: Sold
         type: string
     required:
     - name
@@ -446,7 +451,6 @@ definitions:
   repo.MaintenanceEntryUpdate:
     properties:
       completedDate:
-        description: Sold
         type: string
       cost:
         example: "0"
@@ -456,7 +460,6 @@ definitions:
       name:
         type: string
       scheduledDate:
-        description: Sold
         type: string
     type: object
   repo.MaintenanceLog:
@@ -611,12 +614,7 @@ definitions:
       token:
         type: string
     type: object
-  v1.ActionAmountResult:
-    properties:
-      completed:
-        type: integer
-    type: object
-  v1.ApiSummary:
+  v1.APISummary:
     properties:
       allowRegistration:
         type: boolean
@@ -634,6 +632,11 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  v1.ActionAmountResult:
+    properties:
+      completed:
+        type: integer
     type: object
   v1.Build:
     properties:
@@ -792,6 +795,18 @@ paths:
       summary: Get Item by Asset ID
       tags:
       - Items
+  /v1/currency:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/currencies.Currency'
+      summary: Currency
+      tags:
+      - Base
   /v1/groups:
     get:
       produces:
@@ -944,6 +959,13 @@ paths:
         items:
           type: string
         name: locations
+        type: array
+      - collectionFormat: multi
+        description: parent Ids
+        in: query
+        items:
+          type: string
+        name: parentIds
         type: array
       produces:
       - application/json
@@ -1659,7 +1681,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/v1.ApiSummary'
+            $ref: '#/definitions/v1.APISummary'
       summary: Application Info
       tags:
       - Base
@@ -1702,6 +1724,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/v1.LoginForm'
+      - description: auth provider
+        in: query
+        name: provider
+        type: string
       produces:
       - application/json
       responses:

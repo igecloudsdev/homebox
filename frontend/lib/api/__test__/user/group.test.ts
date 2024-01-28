@@ -2,13 +2,12 @@ import { faker } from "@faker-js/faker";
 import { describe, test, expect } from "vitest";
 import { factories } from "../factories";
 import { sharedUserClient } from "../test-utils";
-import { currencies } from "~~/lib/data/currency";
 
 describe("first time user workflow (register, login, join group)", () => {
   test("user should be able to update group", async () => {
     const { client } = await factories.client.singleUse();
 
-    const name = faker.name.firstName();
+    const name = faker.person.firstName();
 
     const { response, data: group } = await client.group.update({
       name,
@@ -27,20 +26,6 @@ describe("first time user workflow (register, login, join group)", () => {
     expect(response.status).toBe(200);
     expect(group.name).toBeTruthy();
     expect(group.currency).toBe("USD");
-  });
-
-  test("currencies should be in sync with backend", async () => {
-    const { client } = await factories.client.singleUse();
-
-    for (const currency of currencies) {
-      const { response, data: group } = await client.group.update({
-        name: faker.name.firstName(),
-        currency: currency.code,
-      });
-
-      expect(response.status).toBe(200);
-      expect(group.currency).toBe(currency.code);
-    }
   });
 
   test("user should be able to join create join token and have user signup", async () => {
